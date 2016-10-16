@@ -7,38 +7,32 @@ import os
 import time
 import pickle
 import smtplib
+import ConfigParser
 
-# my local unix location is /fs/ext1
-# from there, create the following folders:
-# /fs/ext1/db_bunker
-# /fs/ext1/db_bunker/db_root
-# /fs/ext1/db_bunker/log
-# /fs/ext1/db_bunker/metadata
+def client_info(api_key):
+    """Function to gather client/account metadata"""
+    try:
+        client = dropbox.client.DropboxClient(api_key)
+    expect:
+        print "connecting to Dropbox failed"
+    return client
 
-dropbox_local_path = '/fs/ext1/db_bunker/db_root' # local path for top level dropbox bunker
-prefix = None  #None # set to None (without quotes) for all of dropbox account or set to '/x/y/z' folder structure (you will see folder x in main view on www.dropbox.com after login)
-start_time = time.strftime("%Y%m%d_%H%M%S",time.localtime())
-log_file = '/fs/ext1/db_bunker/log/db_bunker_' + start_time + '.log'
-l_meta_file = '/fs/ext1/db_bunker/metadata/l_files.pickle'
-r_meta_file = '/code/db_bunker/metadata/l_files.pickle'
-meta_rev_file = '/fs/ext1/db_bunker/metadata/l_files_rev.txt'
-incr_bytes = 10485760
-# Gather account info and utilization details
-client = dropbox.client.DropboxClient('xxxxxxx') # create an app on dropbx and copy you token here
-account_info = client.account_info()
-db_quota_info = client.account_info()['quota_info']
-db_total_size = db_quota_info['quota']
-db_used_size = db_quota_info['normal']
+def config_load(section):
+    """Function to read in config file"""
+    config = ConfigParser.ConfigParser()
+    try:
+        config.read(config_file)
+        options = config.options(section)
+        config_data = {}
+        # Populate options
+        for o in options:
+            config_data[o] = config.get(section, o)
+    except:
+        print ("config file %s not readable" % config_file)
+    return config_data
 
-smtp_hub_name = 'smtp.gmail.com'
-smtp_hub_port = 587
-smtp_user = 'xxxxxxx@gmail.com'
-smtp_pass = 'xxxxxxxx'
-to_addr = 'xxxxxxxxx@hotmail.com'
-from_addr = smtp_user
-
-# logging function
 def logger(arg):
+    """Logging Function"""
     print(arg)
     datetime_stamp = '[' + time.strftime("%Y%m%d_%H%M%S",time.localtime()) + ']  '
     out = open(log_file,'a')
@@ -213,22 +207,48 @@ def get_meta_rev(rev_file):
             rev = f.read()
     return rev
 
+# load config file
+config_file = "db_bunker_config.txt"
+
 # Determine if db_bunker is running already
 logger('Starting db_runner.py')
 db_bunker_running()
 
 # Connect to dropbox
-info = client.account_info()
+client = client_info(api_key)
+account_info = client.account_info()
+db_quota_info = client.account_info()['quota_info']
+db_total_size = db_quota_info['quota'] / 1024**3
+db_used_size = db_quota_info['normal'] / 1024**3
+
 logger('Starting db_bunker.py')
-logger('Dropbox Account: ' + info['display_name'])
+logger('Dropbox Account: ' + account_info['display_name'])
+
+# my local unix location is /fs/ext1
+# from there, create the following folders:
+# /fs/ext1/db_bunker
+# /fs/ext1/db_bunker/db_root
+# /fs/ext1/db_bunker/log
+# /fs/ext1/db_bunker/metadata
+
+# Populate variables from config data
+api_key = config_load('Account')['api_key']
+dropbox_local_path = config_load('Paths')['dropbox_local_path']
+local_log_file_path = config_load('Paths')['local_log_file_path']
+local_meta_data_path = config_load('Paths')['local_meta_data_path']
+local_meta_file = local_meta_data_path + '/' + config_load('Paths')['local_meta_file']
+remote_meta_file = remote_meta_path + '/' + config_load('Paths')['remote_meta_file']
+local_meta_rev_file = local_meta_data_path + '/' + config_load('Paths')['local_meta_rev_file']
+start_time = time.strftime("%Y%m%d_%H%M%S",time.localtime())
+log_file = log_file_path + '/db_bunker_' + start_time + '.log'
+incr_bytes = config_load('File_Operations')['incr_bytes']
 
 # Downloading pickle file and loading into hash
-d_meta_rev = get_meta_rev(meta_rev_file)
-logger('Downloading pickle file; rev:  ' + r_meta_file + "; " + d_meta_rev)
-copy_from_dropbox(l_meta_file,r_meta_file,d_meta_rev)
+d_meta_rev = get_meta_rev(local_meta_rev_file)
+logger('Downloading pickle file; rev:  ' + remote_meta_file + "; " + d_meta_rev)
+copy_from_dropbox(local_meta_file,remote_meta_file,d_meta_rev)
 logger('Loading pickle file')
-l_files = pickle_load(l_meta_file)
-#l_files = {}
+l_files = pickle_load(local_meta_file)
 
 # Start bunkering
 logger('Starting Bunkering...')
@@ -237,24 +257,30 @@ logger('Bunkering complete')
 
 # Write out hash and upload to dropbox
 logger('Dumping pickle file')
-pickle_dump(l_meta_file,l_files)
+pickle_dump(local_meta_file,l_files)
 logger('Copying pickle file to dropbox')
-d_meta_rev = (copy_to_dropbox(l_meta_file,r_meta_file))['rev']
-set_meta_rev(d_meta_rev,meta_rev_file)
-logger('New revision ' + d_meta_rev + ' added to revision file:  ' + meta_rev_file)
+d_meta_rev = (copy_to_dropbox(local_meta_file,remote_meta_file))['rev']
+set_meta_rev(d_meta_rev,local_meta_rev_file)
+logger('New revision ' + d_meta_rev + ' added to revision file:  ' + local_meta_rev_file)
 
 # Send summary email
+smtp_hub_name = config_load('Email')[smtp_hub_name]
+smtp_hub_port = config_load('Email')[smtp_hub_port]
+smtp_user = config_load('Email')[smtp_user]
+smtp_pass = config_load('Email')[smtp_pass]
+to_addr = config_load('Email')[to_addr]
+from_addr = smtp_user
 end_time = time.strftime("%Y%m%d_%H%M%S",time.localtime())
 subj = 'db_bunker success'
 body = 'db_bunker Summary:\n'
 body += 'Start_Time: ' + start_time + '\n'
 body += 'End_Time:   ' + end_time + '\n'
 body += 'Files_Proc: ' + str(cnt_files) + '\n'
-body += 'Bytes_Proc (KB): ' + str(tot_bytes/1024) + '\n'
+body += 'Bytes_Proc (KB): ' + '%.2f' % str(tot_bytes/1024) + '\n'
 body += 'Meta_Rev:   ' + d_meta_rev + '\n\n'
-body += 'Dropbox_Total (GB): ' + str(db_total_size/(1024*1024*1024)) + '\n'
-body += 'Dropbox_Used (GB): ' + str(db_used_size/(1024*1024*1024)) + '\n'
-body += 'Dropbox_Free (GB): ' + str((db_total_size - db_used_size)/(1024*1024*1024))
+body += 'Dropbox_Total (GB): ' + '%.2f' % str(db_total_size) + '\n'
+body += 'Dropbox_Used (GB): ' + '%.2f' % str(db_used_size) + '\n'
+body += 'Dropbox_Free (GB): ' + '%.2f' % str(db_total_size - db_used_size)
 smtp_send(subj,body)
 logger('End of Script')
 exit(0)
