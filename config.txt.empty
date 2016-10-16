@@ -1,0 +1,22 @@
+[Account]
+api_key: '' # Add the api key from your dropbox account
+
+[Paths]
+prefix: # None # Set to None to bunker entire dropbox account including shared folders
+dropbox_local_path: '/fs/ext1/db_bunker/db_root' # local path for top level dropbox bunker
+local_log_file_path = '/fs/ext1/db_bunker/log' # local log file path
+local_meta_data_path = /fs/ext1/db_bunker/metadata' # local metadata path
+local_meta_file: 'l_files.pickle' local serialization file to track file metadata
+remote_meta_path = '/code/db_bunker/metadata' # dropbox metadata path
+remote_meta_file: 'l_files.pickle' # dropbox location for serialization file
+local_meta_rev_file: 'l_files_rev.txt' # dropbox version hash of latest pickle file
+
+[File_Operations]
+incr_bytes: 10485760 # byte value for file chunking
+
+[Email]
+smtp_hub_name: '' # smtp server name
+smtp_hub_port:  # smtp server port (integer)
+smtp_user: '' # smtp user
+smtp_pass: '' # smtp password
+to_addr: '' # smtp recipient
