@@ -9,6 +9,5 @@ This script utilizes the dropbox python api to query and download (via chunking 
 
 Wishlist
 - containerize
-- separate out configs into configfile
 - scheduler (instead of cron)
 - better error handling with try/except
