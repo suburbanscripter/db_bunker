@@ -39,8 +39,8 @@ def logger(arg):
     out.write('\r\n' + datetime_stamp + arg)
     out.close()
 
-# smtp function
 def smtp_send(arg_subj,arg_body):
+    """smtp send function"""
     logger('Attempting to send mail:\n  TO: ' + to_addr + '\n  SUBJ: ' + arg_subj + '\n  BODY:\n  ' + arg_body)
     smtp_header = 'To: ' + to_addr + '\n' + 'From: ' + from_addr + '\n' + 'Subject: ' + arg_subj
     s = smtplib.SMTP(smtp_hub_name,smtp_hub_port)
@@ -51,8 +51,8 @@ def smtp_send(arg_subj,arg_body):
     s.sendmail(from_addr,to_addr,smtp_header + '\n\n' + arg_body)
     s.quit()
 
-# check for running db_bunker
 def db_bunker_running():
+    """"determine if db_bunker is running already"""
     proc_running = 0
     for line in os.popen('ps -ef'):
         if re.search('/db_bunker.py',line):
@@ -63,9 +63,8 @@ def db_bunker_running():
     else:
         logger('db_bunker.py is already running, exiting...')
         exit(0)
-
-# create directories
 def dir_maker(arg_dirs):
+    """Build out directories if needed"""
     dir_path = dropbox_local_path
     dirs = arg_dirs.split('/')[1:]
     for d in dirs:
@@ -75,8 +74,8 @@ def dir_maker(arg_dirs):
             logger('Directory not found; creating: ' + dir_path)
             os.mkdir(dir_path)
 
-# function which does all of the work; mostly based on an example from the dropbox python api example
 def list_files(client, files=None, cursor=None):
+    """function which does all of the work; mostly based on an example from the dropbox python api example"""
     cnt_files = 0
     tot_bytes = 0
     if files is None:
